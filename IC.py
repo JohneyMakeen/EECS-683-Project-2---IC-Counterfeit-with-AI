@@ -1,6 +1,6 @@
 import tensorflow as tf
-from tensorflow.keras import datasets, layers, models
 import matplotlib.pyplot as plt
+import sklearn.metrics
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
@@ -15,26 +15,30 @@ train_datagen = ImageDataGenerator(
     fill_mode='nearest'
 )
 
-validation_datagen = ImageDataGenerator(rescale=1./255)
+test_datagen = ImageDataGenerator(rescale=1./255)
 
-TRAIN_DIRECTORY_LOCATION = 'Test'
-VAL_DIRECTORY_LOCATION = 'Train'
-TARGET_SIZE = target_size=(500,500)
+TRAIN_DIRECTORY_LOCATION = 'Train'
+TEST_DIRECTORY_LOCATION = 'Test'
+TARGET_SIZE = (500, 500)
 CLASS_MODE = 'categorical'
 
 train_generator = train_datagen.flow_from_directory(
     TRAIN_DIRECTORY_LOCATION,
     target_size = TARGET_SIZE,
-    batch_size = 128,
+    batch_size = 4,
     class_mode = CLASS_MODE
 )
 
-validation_generator = validation_datagen.flow_from_directory( 
-    VAL_DIRECTORY_LOCATION,
-    target_size=TARGET_SIZE,
-    batch_size=128,
-    class_mode=CLASS_MODE
+test_generator = test_datagen.flow_from_directory(
+    TEST_DIRECTORY_LOCATION,
+    target_size = TARGET_SIZE,
+    batch_size = 4,
+    class_mode = CLASS_MODE,
+    shuffle = False
 )
+
+print("Class mapping:", train_generator.class_indices)
+print("Test class mapping:", test_generator.class_indices)
 
 # Define CNN
 model = tf.keras.models.Sequential([
@@ -59,13 +63,43 @@ NUM_EPOCHS = 5
 history = model.fit(
       train_generator,
       epochs = NUM_EPOCHS,
-      verbose = 1,
-      validation_data = validation_generator)
+      verbose = 1)
+
+# Generate predictions for the test dataset
+test_generator.reset()
+predictions = model.predict(test_generator)
+
+# Obtain predicted class labels and true class labels
+y_pred = predictions.argmax(axis=1)
+y_true = test_generator.classes
+
+# Calculate evaluation metrics
+accuracy = sklearn.metrics.accuracy_score(y_true, y_pred)
+precision = sklearn.metrics.precision_score(y_true, y_pred, pos_label=1, zero_division=0)
+recall = sklearn.metrics.recall_score(y_true, y_pred, pos_label=1, zero_division=0)
+f1 = sklearn.metrics.f1_score(y_true, y_pred, pos_label=1, zero_division=0)
+
+# Display
+print('\nBaseline Detection performance')
+print('--------------------------------')
+print(f'Accuracy: {accuracy:.4f}')
+print(f'Precision: {precision:.4f}')
+print(f'Recall: {recall:.4f}')
+print(f'F1-Score: {f1:.4f}')
+
+# Confusion Matrix
+cm = sklearn.metrics.confusion_matrix(y_true, y_pred, labels=[0,1])
+print('\nConfusion Matrix:')
+print(cm)
+
+# Classification Report
+print('\nClassification Report:')
+cr = sklearn.metrics.classification_report(y_true, y_pred, target_names=['Authentic', 'Counterfeit'], zero_division=0)
+print(cr)
 
 # Plot train and test accuracies vs Epochs
 plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Test/Validation Accuracy')
-plt.title('Training and Test/Validation Accuracies v.s Epochs')
+plt.title('Training Accuracy vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
