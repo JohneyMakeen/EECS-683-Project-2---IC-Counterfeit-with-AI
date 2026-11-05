@@ -14,31 +14,41 @@ train_datagen = ImageDataGenerator(
     horizontal_flip=True,
     fill_mode='nearest'
 )
-
+validation_datagen = ImageDataGenerator(rescale=1./255)
 test_datagen = ImageDataGenerator(rescale=1./255)
 
 TRAIN_DIRECTORY_LOCATION = 'Train'
+VAL_DIRECTORY_LOCATION = 'Validate'
 TEST_DIRECTORY_LOCATION = 'Test'
 TARGET_SIZE = (500, 500)
 CLASS_MODE = 'categorical'
+CLASSES = ['Authentic', 'Counterfeit']
 
 train_generator = train_datagen.flow_from_directory(
     TRAIN_DIRECTORY_LOCATION,
     target_size = TARGET_SIZE,
-    batch_size = 4,
-    class_mode = CLASS_MODE
+    batch_size = 8,
+    class_mode = CLASS_MODE,
+    classes = CLASSES
+)
+
+validation_generator = validation_datagen.flow_from_directory(
+    VAL_DIRECTORY_LOCATION,
+    target_size = TARGET_SIZE,
+    batch_size = 8,
+    class_mode = CLASS_MODE,
+    classes = CLASSES,
+    shuffle = False
 )
 
 test_generator = test_datagen.flow_from_directory(
     TEST_DIRECTORY_LOCATION,
     target_size = TARGET_SIZE,
-    batch_size = 4,
+    batch_size = 8,
     class_mode = CLASS_MODE,
+    classes = CLASSES,
     shuffle = False
 )
-
-print("Class mapping:", train_generator.class_indices)
-print("Test class mapping:", test_generator.class_indices)
 
 # Define CNN
 model = tf.keras.models.Sequential([
@@ -63,7 +73,8 @@ NUM_EPOCHS = 5
 history = model.fit(
       train_generator,
       epochs = NUM_EPOCHS,
-      verbose = 1)
+      verbose = 1,
+      validation_data = validation_generator)
 
 # Generate predictions for the test dataset
 test_generator.reset()
@@ -97,9 +108,10 @@ print('\nClassification Report:')
 cr = sklearn.metrics.classification_report(y_true, y_pred, target_names=['Authentic', 'Counterfeit'], zero_division=0)
 print(cr)
 
-# Plot train and test accuracies vs Epochs
+# Plot training and validation accuracies vs Epochs
 plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.title('Training Accuracy vs. Epochs')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Training & Validation Accuracy v.s Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
