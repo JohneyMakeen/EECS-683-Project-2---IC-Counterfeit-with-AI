@@ -1,44 +1,45 @@
 import tensorflow as tf
-from tensorflow.keras import datasets, layers, models
-import matplotlib.pyplot as plt
+import random
 
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+base_dir = "./dataset"
 
-train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
-    horizontal_flip=True,
-    fill_mode='nearest'
+BATCH_SIZE = 32 # number of training samples processed by the neural network before the model's weights are updated via backpropagation
+IMG_HEIGHT = 256 # 2560 (has to be lowered)
+IMG_WIDTH = 192  # 1920
+SEED = random.randint(1, 9999) # Random seed to maintain identical results
+
+# Load 80% of the images for training
+train_dataset = tf.keras.utils.image_dataset_from_directory(
+    base_dir,
+    validation_split=0.2,
+    subset="training",
+    seed=SEED,
+    image_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    label_mode="categorical",
 )
 
-validation_datagen = ImageDataGenerator(rescale=1./255)
-
-TRAIN_DIRECTORY_LOCATION = 'Test'
-VAL_DIRECTORY_LOCATION = 'Train'
-TARGET_SIZE = target_size=(500,500)
-CLASS_MODE = 'categorical'
-
-train_generator = train_datagen.flow_from_directory(
-    TRAIN_DIRECTORY_LOCATION,
-    target_size = TARGET_SIZE,
-    batch_size = 128,
-    class_mode = CLASS_MODE
+# Load the remaining 20% of the images for validation
+val_dataset = tf.keras.utils.image_dataset_from_directory(
+    base_dir,
+    validation_split=0.2,
+    subset="validation",
+    seed=SEED,
+    image_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    label_mode="categorical",
 )
 
-validation_generator = validation_datagen.flow_from_directory( 
-    VAL_DIRECTORY_LOCATION,
-    target_size=TARGET_SIZE,
-    batch_size=128,
-    class_mode=CLASS_MODE
-)
+# Confirm class names
+class_names = train_dataset.class_names
+print(f"Class names found: {class_names}")
 
 # Define CNN
 model = tf.keras.models.Sequential([
-  tf.keras.layers.Input(shape=(500,500, 3)),
+
+  # Rescaling layer shifts pixel values from [0, 255] to [0, 1]
+  tf.keras.layers.Rescaling(1.0 / 255, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
+
   tf.keras.layers.Conv2D(32, (3,3), activation='relu'),
   tf.keras.layers.MaxPooling2D(2, 2),
   tf.keras.layers.Conv2D(64, (3,3), activation='relu'),
@@ -52,20 +53,22 @@ model = tf.keras.models.Sequential([
 
 model.summary()
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy', 'precision', 'recall'])
 
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 
 history = model.fit(
-      train_generator,
-      epochs = NUM_EPOCHS,
-      verbose = 1,
-      validation_data = validation_generator)
+    train_dataset,
+    validation_data = val_dataset,
+    epochs = NUM_EPOCHS,
+    verbose = 1)
+
+import matplotlib.pyplot as plt
 
 # Plot train and test accuracies vs Epochs
 plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Test/Validation Accuracy')
-plt.title('Training and Test/Validation Accuracies v.s Epochs')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Training and Validation Accuracies v.s Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
